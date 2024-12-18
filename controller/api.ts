@@ -18,10 +18,13 @@ export class UserController {
         return;
       }
 
-      const users = await UserCollection.getOneUser(db, user.userId);
+      const users = await UserCollection.getOneUserByEmail(db, user.email);
       res.status(200).json({
         message: "ok",
-        data: users,
+        data: {
+          email: users?.email,
+          name: users?.name
+        },
       });
     } catch (e) {
       console.error(e);
@@ -33,46 +36,72 @@ export class UserController {
     const { email, password, name } = req.body;
 
     try {
-      const usersCol = collection(db, "users");
-      const emailQuery = query(usersCol, where("email", "==", email));
-      const emailSnapshot = await getDocs(emailQuery);
-
-      if (!emailSnapshot.empty) {
+      const emailExists = await UserCollection.getOneUserByEmail(db, email);
+      if (emailExists) {
         res.status(400).json({ message: "Email already exists." });
         return;
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      const userRef = await addDoc(usersCol, { email, password: hashedPassword, name });
-      res.status(201).json({ message: "User created successfully.", userId: userRef.id });
+      const newUser = await UserCollection.createUser(db, { email, password, name })
+      res.status(201).json({
+        message: "User created successfully.",
+        data: newUser
+      });
     } catch (e) {
       console.error(e);
       next(e);
     }
   }
 
-  static async loginUser(req: Request, res: Response, next: NextFunction): Promise<void> {
-    const { email, password } = req.body;
+  static async updateUser(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    const requestUser = req.user as User;
+    const { name, email, password } = req.body as Partial<User>;
+    if (!requestUser) {
+      res.status(403).json({ message: "Unauthorized access" });
+      return;
+    }
 
     try {
-      const usersCol = collection(db, "users");
-      const emailQuery = query(usersCol, where("email", "==", email));
-      const emailSnapshot = await getDocs(emailQuery);
+      const userData = await UserCollection.getOneUserByEmail(db, requestUser.email);
 
-      if (emailSnapshot.empty) {
+      const updateData = {
+        name: name || userData?.name,
+        email: email || userData?.email
+      } as User;
+
+      if (password) {
+        updateData.password = await bcrypt.hash(password, 10);
+      } else {
+        updateData.password = userData?.password || ''
+      }
+
+      await UserCollection.updateUser(db, requestUser.userId, updateData);
+      res.status(200).json({ message: "User updated" });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        res.status(500).json({ message: error.message })
+      } else {
+        res.status(500).json({ message: "An error occurred." });
+      }
+    }
+  }
+
+  static async loginUser(req: Request, res: Response, next: NextFunction): Promise<void> {
+    const { email, password } = req.body as User;
+
+    try {
+      const userData = await UserCollection.getOneUserByEmail(db, email);
+
+      if (!userData) {
         res.status(401).json({ message: "Invalid email or password." });
         return;
       }
-
-      const userDoc = emailSnapshot.docs[0];
-      const userData = userDoc.data();
 
       const isPasswordValid = await bcrypt.compare(password, userData.password);
 
       if (isPasswordValid) {
         const token = jwt.sign(
-          { userId: userDoc.id, email: userData.email },
+          { userId: userData.userId, email: userData.email },
           JWT_SECRET,
           { expiresIn: "1h" }
         );

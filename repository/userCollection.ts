@@ -4,10 +4,10 @@ import {
   Firestore,
   getDoc,
   getDocs,
-  setDoc,
   updateDoc,
   query,
   where,
+  addDoc,
 } from "firebase/firestore/lite";
 import bcrypt from "bcrypt";
 import { User } from "../entities/user";
@@ -20,10 +20,36 @@ export class UserCollection {
     return userList as User[];
   }
 
+  static async checkEmailExists(db: Firestore, email: string): Promise<boolean> {
+    const usersCol = collection(db, "users");
+    const emailQuery = query(usersCol, where("email", "==", email));
+    const emailSnapshot = await getDocs(emailQuery);
+
+    return !emailSnapshot.empty;
+  }
+
+  static async getOneUserByEmail(db: Firestore, email: string): Promise<User | null> {
+    try {
+      const usersCol = collection(db, "users");
+      const emailQuery = query(usersCol, where("email", "==", email));
+      const emailSnapshot = await getDocs(emailQuery);
+  
+      if (!emailSnapshot.empty) {
+        const userDoc = emailSnapshot.docs[0];
+        const userData = userDoc.data() as User;
+
+        return { ...userData, userId: userDoc.id }; 
+      }
+  
+      return null;
+    } catch (error) {
+      throw new Error("error getting user by email");
+    }
+  }
+
   static async getOneUser(db: Firestore, userId: string): Promise<User | null> {
     try {
       const userDocRef = doc(db, "users", userId);
-
       const userDocSnapshot = await getDoc(userDocRef);
 
       if (userDocSnapshot.exists()) {
@@ -41,24 +67,29 @@ export class UserCollection {
   static async updateUser(db: Firestore, userId: string, updateData: Partial<User>): Promise<void> {
     try {
       const userDocRef = doc(db, "users", userId);
-
-      // `updateDoc` updates only the specified fields; it won't overwrite the entire document
       await updateDoc(userDocRef, updateData);
     } catch (error) {
-      console.error(`Error updating user with ID: ${userId}`, error);
+      throw new Error(`Error updating user ${error}`);
     }
   }
 
-  static async createUser(db: Firestore, userId: string, userData: User): Promise<void> {
+  static async createUser(db: Firestore, userData: Partial<User>): Promise<User | null> {
     try {
+      if (!userData.password) throw new Error("Password is required.");
+  
       const hashedPassword = await bcrypt.hash(userData.password, 10);
-      const userDocRef = doc(db, "users", userId);
-
-      await setDoc(userDocRef, { ...userData, password: hashedPassword });
+      const usersCol = collection(db, "users");
+  
+      const createdUserRef = await addDoc(usersCol, { ...userData, password: hashedPassword });
+  
+      const { password, ...userWithoutPassword } = userData as User;
+      return { ...userWithoutPassword, userId: createdUserRef.id } as User;  
     } catch (error) {
-      console.error(`Error creating user with ID: ${userId}`, error);
+      console.error("Error creating user:", error);
+      return null;
     }
   }
+  
 
   static async loginUser(db: Firestore, email: string, password: string): Promise<User | null> {
     try {
