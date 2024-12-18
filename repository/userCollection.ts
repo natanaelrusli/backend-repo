@@ -11,21 +11,21 @@ import {
 } from "firebase/firestore/lite";
 import bcrypt from "bcrypt";
 import { User } from "../entities/user";
+import { ResponseError } from "../errors/responseError";
 
 export class UserCollection {
   static async getUsers(db: Firestore): Promise<User[]> {
-    const usersCol = collection(db, "users");
-    const userSnapshot = await getDocs(usersCol);
-    const userList = userSnapshot.docs.map((doc) => doc.data());
-    return userList as User[];
-  }
-
-  static async checkEmailExists(db: Firestore, email: string): Promise<boolean> {
-    const usersCol = collection(db, "users");
-    const emailQuery = query(usersCol, where("email", "==", email));
-    const emailSnapshot = await getDocs(emailQuery);
-
-    return !emailSnapshot.empty;
+    try {
+      const usersCol = collection(db, "users");
+      const userSnapshot = await getDocs(usersCol);
+      const userList = userSnapshot.docs.map((doc) => doc.data());
+      return userList as User[];
+    } catch (error) {
+      throw new ResponseError(
+        500,
+        "Error getting user."
+      );
+    }
   }
 
   static async getOneUserByEmail(db: Firestore, email: string): Promise<User | null> {
@@ -74,46 +74,36 @@ export class UserCollection {
   }
 
   static async createUser(db: Firestore, userData: Partial<User>): Promise<User | null> {
-    try {
-      if (!userData.password) throw new Error("Password is required.");
-  
-      const hashedPassword = await bcrypt.hash(userData.password, 10);
-      const usersCol = collection(db, "users");
-  
-      const createdUserRef = await addDoc(usersCol, { ...userData, password: hashedPassword });
-  
-      const { password, ...userWithoutPassword } = userData as User;
-      return { ...userWithoutPassword, userId: createdUserRef.id } as User;  
-    } catch (error) {
-      console.error("Error creating user:", error);
-      return null;
+    if (!userData.password) {
+      throw new ResponseError(400, "Password is required.");
     }
+
+    const hashedPassword = await bcrypt.hash(userData.password, 10);
+    const usersCol = collection(db, "users");
+
+    const createdUserRef = await addDoc(usersCol, { ...userData, password: hashedPassword });
+
+    const { password, ...userWithoutPassword } = userData as User;
+    return { ...userWithoutPassword, userId: createdUserRef.id } as User;
   }
   
 
   static async loginUser(db: Firestore, email: string, password: string): Promise<User | null> {
-    try {
-      const usersCol = collection(db, "users");
-      const q = query(usersCol, where("email", "==", email));
-      const userSnapshot = await getDocs(q);
+    const usersCol = collection(db, "users");
+    const q = query(usersCol, where("email", "==", email));
+    const userSnapshot = await getDocs(q);
 
-      if (!userSnapshot.empty) {
-        const userDoc = userSnapshot.docs[0];
-        const userData = userDoc.data() as User;
+    if (!userSnapshot.empty) {
+      const userDoc = userSnapshot.docs[0];
+      const userData = userDoc.data() as User;
 
-        const isPasswordValid = await bcrypt.compare(password, userData.password);
-        if (isPasswordValid) {
-          return userData;
-        } else {
-          console.warn("Invalid password.");
-        }
+      const isPasswordValid = await bcrypt.compare(password, userData.password);
+      if (isPasswordValid) {
+        return userData;
       } else {
-        console.warn("No user found with the given email.");
+        throw new ResponseError(400, "Invalid password.");
       }
-      return null;
-    } catch (error) {
-      console.error("Error logging in user", error);
-      return null;
     }
+    return null;
   }
 }

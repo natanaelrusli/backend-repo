@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import bcrypt from 'bcrypt';
 import jwt from "jsonwebtoken";
-import { addDoc, collection, getDocs, query, where } from "firebase/firestore/lite";
 import { UserCollection } from "../repository/userCollection";
 import { db } from "../config/firebaseConfig";
 import { AuthRequest } from "../middleware/authMiddleware";
@@ -27,7 +26,6 @@ export class UserController {
         },
       });
     } catch (e) {
-      console.error(e);
       next(e);
     }
   }
@@ -48,7 +46,6 @@ export class UserController {
         data: newUser
       });
     } catch (e) {
-      console.error(e);
       next(e);
     }
   }
@@ -92,16 +89,11 @@ export class UserController {
     try {
       const userData = await UserCollection.getOneUserByEmail(db, email);
 
-      if (!userData) {
-        res.status(401).json({ message: "Invalid email or password." });
-        return;
-      }
-
-      const isPasswordValid = await bcrypt.compare(password, userData.password);
+      const isPasswordValid = await bcrypt.compare(password, userData?.password || '');
 
       if (isPasswordValid) {
         const token = jwt.sign(
-          { userId: userData.userId, email: userData.email },
+          { userId: userData?.userId, email: userData?.email },
           JWT_SECRET,
           { expiresIn: "1h" }
         );
@@ -111,7 +103,6 @@ export class UserController {
         res.status(401).json({ message: "Invalid email or password." });
       }
     } catch (e) {
-      console.error(e);
       next(e);
     }
   }
