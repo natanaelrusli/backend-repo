@@ -5,6 +5,8 @@ import { UserCollection } from "../repository/userCollection";
 import { db } from "../config/firebaseConfig";
 import { AuthRequest } from "../middleware/authMiddleware";
 import { User } from "../entities/user";
+import { ResponseError } from "../errors/responseError";
+import { sendResponse } from "../utils/responseHelper";  // Import the response helper
 
 const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
 
@@ -13,17 +15,13 @@ export class UserController {
     try {
       const user = req.user as User;
       if (!user) {
-        res.status(403).json({ message: "Unauthorized access" });
-        return;
+        throw new ResponseError(403, "Unauthorized access")
       }
 
       const users = await UserCollection.getOneUserByEmail(db, user.email);
-      res.status(200).json({
-        message: "ok",
-        data: {
-          email: users?.email,
-          name: users?.name
-        },
+      sendResponse(res, 200, "User data fetched successfully", {
+        email: users?.email,
+        name: users?.name,
       });
     } catch (e) {
       next(e);
@@ -36,15 +34,11 @@ export class UserController {
     try {
       const emailExists = await UserCollection.getOneUserByEmail(db, email);
       if (emailExists) {
-        res.status(400).json({ message: "Email already exists." });
-        return;
+        throw new ResponseError(400, "Email already exists.");
       }
 
-      const newUser = await UserCollection.createUser(db, { email, password, name })
-      res.status(201).json({
-        message: "User created successfully.",
-        data: newUser
-      });
+      const newUser = await UserCollection.createUser(db, { email, password, name });
+      sendResponse(res, 201, "User created successfully", newUser);
     } catch (e) {
       next(e);
     }
@@ -53,9 +47,9 @@ export class UserController {
   static async updateUser(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     const requestUser = req.user as User;
     const { name, email, password } = req.body as Partial<User>;
+
     if (!requestUser) {
-      res.status(403).json({ message: "Unauthorized access" });
-      return;
+      throw new ResponseError(403, "Unauthorized access");
     }
 
     try {
@@ -63,23 +57,19 @@ export class UserController {
 
       const updateData = {
         name: name || userData?.name,
-        email: email || userData?.email
+        email: email || userData?.email,
       } as User;
 
       if (password) {
         updateData.password = await bcrypt.hash(password, 10);
       } else {
-        updateData.password = userData?.password || ''
+        updateData.password = userData?.password || '';
       }
 
       await UserCollection.updateUser(db, requestUser.userId, updateData);
-      res.status(200).json({ message: "User updated" });
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        res.status(500).json({ message: error.message })
-      } else {
-        res.status(500).json({ message: "An error occurred." });
-      }
+      sendResponse(res, 200, "User updated successfully");
+    } catch (e) {
+      next(e);
     }
   }
 
@@ -98,9 +88,9 @@ export class UserController {
           { expiresIn: "1h" }
         );
 
-        res.status(200).json({ message: "Login successful.", token: token });
+        sendResponse(res, 200, "Login successful", { token });
       } else {
-        res.status(401).json({ message: "Invalid email or password." });
+        sendResponse(res, 401, "Invalid email or password.");
       }
     } catch (e) {
       next(e);

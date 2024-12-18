@@ -15,62 +15,42 @@ import { ResponseError } from "../errors/responseError";
 
 export class UserCollection {
   static async getUsers(db: Firestore): Promise<User[]> {
-    try {
-      const usersCol = collection(db, "users");
-      const userSnapshot = await getDocs(usersCol);
-      const userList = userSnapshot.docs.map((doc) => doc.data());
-      return userList as User[];
-    } catch (error) {
-      throw new ResponseError(
-        500,
-        "Error getting user."
-      );
-    }
+    const usersCol = collection(db, "users");
+    const userSnapshot = await getDocs(usersCol);
+    const userList = userSnapshot.docs.map((doc) => doc.data());
+    return userList as User[];
   }
 
   static async getOneUserByEmail(db: Firestore, email: string): Promise<User | null> {
-    try {
-      const usersCol = collection(db, "users");
-      const emailQuery = query(usersCol, where("email", "==", email));
-      const emailSnapshot = await getDocs(emailQuery);
-  
-      if (!emailSnapshot.empty) {
-        const userDoc = emailSnapshot.docs[0];
-        const userData = userDoc.data() as User;
+    const usersCol = collection(db, "users");
+    const emailQuery = query(usersCol, where("email", "==", email));
+    const emailSnapshot = await getDocs(emailQuery);
 
-        return { ...userData, userId: userDoc.id }; 
-      }
-  
-      return null;
-    } catch (error) {
-      throw new Error("error getting user by email");
+    if (!emailSnapshot.empty) {
+      const userDoc = emailSnapshot.docs[0];
+      const userData = userDoc.data() as User;
+
+      return { ...userData, userId: userDoc.id }; 
     }
+
+    return null;
   }
 
   static async getOneUser(db: Firestore, userId: string): Promise<User | null> {
-    try {
-      const userDocRef = doc(db, "users", userId);
-      const userDocSnapshot = await getDoc(userDocRef);
+    const userDocRef = doc(db, "users", userId);
+    const userDocSnapshot = await getDoc(userDocRef);
 
-      if (userDocSnapshot.exists()) {
-        return userDocSnapshot.data() as User;
-      } else {
-        console.warn(`No user found with ID: ${userId}`);
-        return null;
-      }
-    } catch (error) {
-      console.error(`Error fetching user with ID: ${userId}`, error);
+    if (userDocSnapshot.exists()) {
+      return userDocSnapshot.data() as User;
+    } else {
+      console.warn(`No user found with ID: ${userId}`);
       return null;
     }
   }
 
   static async updateUser(db: Firestore, userId: string, updateData: Partial<User>): Promise<void> {
-    try {
-      const userDocRef = doc(db, "users", userId);
-      await updateDoc(userDocRef, updateData);
-    } catch (error) {
-      throw new Error(`Error updating user ${error}`);
-    }
+    const userDocRef = doc(db, "users", userId);
+    await updateDoc(userDocRef, updateData);
   }
 
   static async createUser(db: Firestore, userData: Partial<User>): Promise<User | null> {
