@@ -6,7 +6,8 @@ import { db } from "../config/firebaseConfig";
 import { AuthRequest } from "../middleware/authMiddleware";
 import { User } from "../entities/user";
 import { ResponseError } from "../errors/responseError";
-import { sendResponse } from "../utils/responseHelper";  // Import the response helper
+import { sendResponse } from "../utils/responseHelper";
+import { validateEmail } from "../utils/validate";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
 
@@ -46,25 +47,32 @@ export class UserController {
 
   static async updateUser(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     const requestUser = req.user as User;
-    const { name, email, password } = req.body as Partial<User>;
-
-    if (!requestUser) {
-      throw new ResponseError(403, "Unauthorized access");
-    }
+    const { name, email } = req.body as Partial<User>;
 
     try {
+      if (!email) {
+        throw new ResponseError(400, "Please provide data to update");
+      }
+
+      if (!validateEmail(email)) {
+        throw new ResponseError(400, "Invalid Email");
+      }
+
+      if (!name) {
+        throw new ResponseError(400, "Please provide name to update");
+      }
+
+      if (!requestUser) {
+        throw new ResponseError(403, "Unauthorized access");
+      }
+
       const userData = await UserCollection.getOneUserByEmail(db, requestUser.email);
 
       const updateData = {
         name: name || userData?.name,
         email: email || userData?.email,
+        password: userData?.password,
       } as User;
-
-      if (password) {
-        updateData.password = await bcrypt.hash(password, 10);
-      } else {
-        updateData.password = userData?.password || '';
-      }
 
       await UserCollection.updateUser(db, requestUser.userId, updateData);
       sendResponse(res, 200, "User updated successfully");
