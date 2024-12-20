@@ -2,12 +2,14 @@
   "name": "backend-repo",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "index.ts",
   "type": "module",
   "scripts": {
     "start": "node ./dist/core/app.js",
+    "dev": "nodemon --exec tsx ./index.ts",
     "build": "tsc && tsc-alias",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "deploy": "npm run build && firebase deploy --only functions"
   },
   "repository": {
     "type": "git",
