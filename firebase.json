@@ -2,19 +2,5 @@
   "functions": {
     "source": "dist",
     "runtime": "nodejs18"
-  },
-  "emulators": {
-    "functions": {
-      "port": 5001
-    },
-    "hosting": {
-      "port": 5000
-    },
-    "auth": {
-      "port": 9099
-    },
-    "pubsub": {
-      "port": 8085
-    }
   }
 }

@@ -2,14 +2,17 @@
   "name": "backend-repo",
   "version": "1.0.0",
   "description": "",
-  "main": "index.ts",
+  "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node ./dist/core/app.js",
+    "start": "node ./dist/index.js",
     "dev": "nodemon --exec tsx ./index.ts",
-    "build": "tsc && tsc-alias",
+    "build": "tsc && tsc-alias && cp package.json ./dist && cp index.js ./dist",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "npm run build && firebase deploy --only functions"
+  },
+  "engines": {
+    "node": "18"
   },
   "repository": {
     "type": "git",
@@ -28,6 +31,8 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "firebase": "^11.1.0",
+    "firebase-admin": "^13.0.2",
+    "firebase-functions": "^6.2.0",
     "jsonwebtoken": "^9.0.2",
     "winston": "^3.17.0"
   },
